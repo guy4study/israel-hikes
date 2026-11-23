@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>מוצא מסלולי טיולים בישראל</title>
+  <link rel="stylesheet" href="style.css?v=4" />
+</head>
+<body>
+  <header>
+    <h1>🥾 מוצא מסלולי טיולים בישראל</h1>
+    <p>הקלידו שם של מקום בישראל וקבלו המלצות למסלולי הליכה בסביבה.</p>
+  </header>
+
+  <main>
+    <form id="search-form" autocomplete="off">
+      <input
+        id="place-input"
+        type="text"
+        placeholder="לדוגמה: ירושלים, צפת, אילת..."
+        required
+      />
+      <select id="difficulty">
+        <option value="all">כל רמות הקושי</option>
+        <option value="Easy">קל</option>
+        <option value="Moderate">בינוני</option>
+        <option value="Hard">קשה</option>
+      </select>
+      <input id="max-length" type="number" min="1" step="1" placeholder="אורך מסלול מקסימלי (ק״מ)" />
+      <input id="max-distance" type="number" min="1" step="1" placeholder="מרחק מקסימלי מהמקום (ק״מ)" />
+      <button type="submit">חיפוש מסלולים</button>
+    </form>
+
+    <section id="weather"></section>
+    <p id="status"></p>
+    <div id="results"></div>
+  </main>
+
+  <footer>
+    המידע על המסלולים משוער — בדקו תמיד את תנאי השטח, מזג האוויר ושעות הפתיחה לפני היציאה.
+  </footer>
+
+  <!-- ?v=... forces the browser to load the newest version of the files -->
+  <script src="trails.js?v=4"></script>
+  <script src="app.js?v=4"></script>
+</body>
+</html>

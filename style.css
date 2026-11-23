@@ -1,0 +1,130 @@
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  font-family: system-ui, "Segoe UI", Arial, sans-serif;
+  background: #f4f1ea;
+  color: #2b2b2b;
+}
+
+header {
+  background: linear-gradient(135deg, #2f6b3a, #4f8f4a);
+  color: white;
+  text-align: center;
+  padding: 40px 16px 32px;
+}
+header h1 { margin: 0 0 8px; font-size: 2.2rem; }
+header p { margin: 0; opacity: 0.9; }
+
+main { max-width: 1180px; margin: 0 auto; padding: 24px 16px; }
+
+/* ---- Search controls: one row on wide screens ---- */
+#search-form {
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: stretch;
+  gap: 8px;
+  margin-top: -48px;
+  background: white;
+  padding: 12px;
+  border-radius: 12px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+}
+#search-form input,
+#search-form select,
+#search-form button {
+  height: 46px;
+  padding: 0 12px;
+  font-size: 0.95rem;
+  font-family: inherit;
+  border-radius: 8px;
+  border: 1px solid #ccc;
+  min-width: 0; /* lets fields shrink instead of overflowing */
+}
+#place-input { flex: 1 1 0; }
+#difficulty { flex: 0 0 165px; background: white; }
+#max-length, #max-distance { flex: 0 0 240px; }
+#search-form button { flex: 0 0 auto; white-space: nowrap; padding: 0 20px; }
+
+/* Narrower screens (tablets, phones): let the controls wrap onto more rows */
+@media (max-width: 1150px) {
+  #search-form { flex-wrap: wrap; }
+  #place-input { flex: 1 1 100%; }
+  #difficulty { flex: 1 1 160px; }
+  #max-length, #max-distance { flex: 1 1 220px; }
+  #search-form button { flex: 1 1 100%; }
+}
+button {
+  background: #2f6b3a;
+  color: white;
+  border: none;
+  cursor: pointer;
+}
+button:hover { background: #24542d; }
+
+#status { color: #555; min-height: 1.2em; }
+
+/* ---- Weather ---- */
+#weather { margin-top: 20px; }
+#weather h2 { font-size: 1.1rem; margin: 0 0 10px; }
+.forecast {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 8px;
+}
+.day {
+  background: white;
+  border-radius: 12px;
+  padding: 10px 6px;
+  text-align: center;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+  font-size: 0.85rem;
+}
+.day .name { font-weight: 600; }
+.day .icon { font-size: 1.8rem; margin: 4px 0; }
+.day .desc { color: #555; font-size: 0.8rem; margin-bottom: 2px; }
+.day .temp { font-weight: 600; font-size: 0.95rem; }
+.day .extra { color: #666; margin-top: 2px; }
+.warning {
+  background: #fff4e0;
+  border-inline-start: 4px solid #e69500;
+  padding: 8px 12px;
+  border-radius: 6px;
+  margin-top: 8px;
+  font-size: 0.9rem;
+}
+@media (max-width: 520px) {
+  .forecast { grid-template-columns: repeat(3, 1fr); }
+}
+
+.card {
+  background: white;
+  border-radius: 12px;
+  padding: 16px 20px;
+  margin-bottom: 14px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+}
+.card h3 { margin: 0 0 4px; }
+.card .meta { color: #666; font-size: 0.9rem; margin-bottom: 8px; }
+.card p { margin: 8px 0; line-height: 1.5; }
+.card a { color: #2f6b3a; font-weight: 600; }
+.card .links { display: flex; gap: 20px; flex-wrap: wrap; }
+
+.badge {
+  display: inline-block;
+  padding: 2px 10px;
+  border-radius: 999px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  margin-inline-end: 6px;
+}
+.Easy { background: #dff3e0; color: #1f6b2a; }
+.Moderate { background: #fff1d1; color: #8a5a00; }
+.Hard { background: #fbdcdc; color: #9b1c1c; }
+
+footer {
+  text-align: center;
+  color: #777;
+  font-size: 0.85rem;
+  padding: 24px 16px 40px;
+}
