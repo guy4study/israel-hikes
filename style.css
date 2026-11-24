@@ -141,9 +141,11 @@ footer .version {
 #restaurants .sub { color: #666; margin: 0 0 12px; font-size: 0.9rem; }
 .restaurant-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  grid-template-columns: repeat(3, 1fr); /* 6 restaurants = 2 full rows */
   gap: 12px;
 }
+@media (max-width: 900px) { .restaurant-grid { grid-template-columns: repeat(2, 1fr); } }
+@media (max-width: 560px) { .restaurant-grid { grid-template-columns: 1fr; } }
 .restaurant {
   background: white;
   border-radius: 12px;

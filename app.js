@@ -196,11 +196,15 @@ const MIN_REVIEWS = 200;     // מסעדה נכללת רק עם 200 ביקורו
 const MAX_RESTAURANTS = 6;
 
 const PRICE_LEVELS = {
-  PRICE_LEVEL_INEXPENSIVE: "₪",
-  PRICE_LEVEL_MODERATE: "₪₪",
-  PRICE_LEVEL_EXPENSIVE: "₪₪₪",
-  PRICE_LEVEL_VERY_EXPENSIVE: "₪₪₪₪",
+  PRICE_LEVEL_INEXPENSIVE: "מחיר זול",
+  PRICE_LEVEL_MODERATE: "מחיר בינוני",
+  PRICE_LEVEL_EXPENSIVE: "יקר",
+  PRICE_LEVEL_VERY_EXPENSIVE: "יקר מאוד",
 };
+
+// מקומות שהם בעיקר לינה (מלון עם מסעדה) – לא נכללים בהמלצות
+const LODGING_TYPES = ["hotel", "lodging", "guest_house", "hostel", "inn", "motel",
+  "resort_hotel", "bed_and_breakfast", "extended_stay_hotel", "cottage", "farmstay"];
 
 async function showRestaurants(location) {
   if (!GOOGLE_API_KEY) return; // אין מפתח – לא מציגים את האזור
@@ -242,7 +246,7 @@ async function searchRestaurants(location, radiusMeters) {
       "X-Goog-FieldMask": [
         "places.displayName", "places.rating", "places.userRatingCount",
         "places.formattedAddress", "places.googleMapsUri", "places.location",
-        "places.priceLevel", "places.primaryTypeDisplayName",
+        "places.priceLevel", "places.primaryType", "places.primaryTypeDisplayName",
       ].join(","),
     },
     body: JSON.stringify({
@@ -262,10 +266,11 @@ async function searchRestaurants(location, radiusMeters) {
   return data.places || [];
 }
 
-// רק 200+ ביקורות, ממוינות לפי דירוג (ובשוויון – לפי מספר ביקורות)
+// רק 200+ ביקורות, בלי בתי מלון, ממוינות לפי דירוג (ובשוויון – לפי מספר ביקורות)
 function pickTopRestaurants(places) {
   return places
     .filter((p) => (p.userRatingCount || 0) >= MIN_REVIEWS && p.rating)
+    .filter((p) => !LODGING_TYPES.includes(p.primaryType))
     .sort((a, b) => b.rating - a.rating || b.userRatingCount - a.userRatingCount)
     .slice(0, MAX_RESTAURANTS);
 }
