@@ -18,6 +18,7 @@ form.addEventListener("submit", async (event) => {
   statusEl.textContent = "מחפש…";
   resultsEl.innerHTML = "";
   weatherEl.innerHTML = "";
+  restaurantsEl.innerHTML = "";
 
   const location = await findLocation(query);
   if (!location) {
@@ -27,6 +28,7 @@ form.addEventListener("submit", async (event) => {
 
   showHikes(location);
   showWeather(location);
+  showRestaurants(location);
 });
 
 // הופך שם מקום ל- { name, lat, lng }
@@ -186,4 +188,108 @@ function hikingWarnings(d) {
     warnings.push("💨 רוחות חזקות — היזהרו על מצוקים ורכסים חשופים.");
   }
   return warnings.map((w) => `<div class="warning">${w}</div>`).join("");
+}
+
+// ---------------- מסעדות (Google Places API New) ----------------
+const restaurantsEl = document.getElementById("restaurants");
+const MIN_REVIEWS = 200;     // מסעדה נכללת רק עם 200 ביקורות ומעלה
+const MAX_RESTAURANTS = 6;
+
+const PRICE_LEVELS = {
+  PRICE_LEVEL_INEXPENSIVE: "₪",
+  PRICE_LEVEL_MODERATE: "₪₪",
+  PRICE_LEVEL_EXPENSIVE: "₪₪₪",
+  PRICE_LEVEL_VERY_EXPENSIVE: "₪₪₪₪",
+};
+
+async function showRestaurants(location) {
+  if (!GOOGLE_API_KEY) return; // אין מפתח – לא מציגים את האזור
+
+  restaurantsEl.innerHTML = "<p>טוען מסעדות…</p>";
+  try {
+    // קודם ברדיוס 5 ק״מ; אם יש מעט תוצאות, מרחיבים ל-20 ק״מ
+    let top = pickTopRestaurants(await searchRestaurants(location, 5000));
+    if (top.length < 3) {
+      top = pickTopRestaurants(await searchRestaurants(location, 20000));
+    }
+
+    if (top.length === 0) {
+      restaurantsEl.innerHTML = `<h2>🍽️ מסעדות מומלצות ליד ${escapeHtml(location.name)}</h2>
+        <p>לא נמצאו בסביבה מסעדות עם ${MIN_REVIEWS} ביקורות או יותר.</p>`;
+      return;
+    }
+
+    restaurantsEl.innerHTML = `
+      <h2>🍽️ מסעדות מומלצות ליד ${escapeHtml(location.name)}</h2>
+      <p class="sub">המדורגות ביותר בגוגל, עם ${MIN_REVIEWS} ביקורות ומעלה</p>
+      <div class="restaurant-grid">
+        ${top.map((r) => renderRestaurant(r, location)).join("")}
+      </div>
+      <p class="attribution">נתוני מסעדות: Google Maps</p>`;
+  } catch (err) {
+    console.error("Restaurants failed:", err);
+    restaurantsEl.innerHTML = "<p>לא ניתן לטעון המלצות למסעדות כרגע.</p>";
+  }
+}
+
+// חיפוש מסעדות ליד נקודה (עד 20 תוצאות, לפי פופולריות)
+async function searchRestaurants(location, radiusMeters) {
+  const response = await fetch("https://places.googleapis.com/v1/places:searchNearby", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "X-Goog-Api-Key": GOOGLE_API_KEY,
+      "X-Goog-FieldMask": [
+        "places.displayName", "places.rating", "places.userRatingCount",
+        "places.formattedAddress", "places.googleMapsUri", "places.location",
+        "places.priceLevel", "places.primaryTypeDisplayName",
+      ].join(","),
+    },
+    body: JSON.stringify({
+      includedTypes: ["restaurant"],
+      maxResultCount: 20,
+      rankPreference: "POPULARITY",
+      languageCode: "he",
+      locationRestriction: {
+        circle: { center: { latitude: location.lat, longitude: location.lng }, radius: radiusMeters },
+      },
+    }),
+  });
+  if (!response.ok) {
+    throw new Error(`Places API ${response.status}: ${await response.text()}`);
+  }
+  const data = await response.json();
+  return data.places || [];
+}
+
+// רק 200+ ביקורות, ממוינות לפי דירוג (ובשוויון – לפי מספר ביקורות)
+function pickTopRestaurants(places) {
+  return places
+    .filter((p) => (p.userRatingCount || 0) >= MIN_REVIEWS && p.rating)
+    .sort((a, b) => b.rating - a.rating || b.userRatingCount - a.userRatingCount)
+    .slice(0, MAX_RESTAURANTS);
+}
+
+function renderRestaurant(place, location) {
+  const name = escapeHtml(place.displayName?.text || "");
+  const type = escapeHtml(place.primaryTypeDisplayName?.text || "מסעדה");
+  const address = escapeHtml(place.formattedAddress || "");
+  const price = PRICE_LEVELS[place.priceLevel] || "";
+  const km = place.location
+    ? Math.round(distanceKm(location.lat, location.lng, place.location.latitude, place.location.longitude) * 10) / 10
+    : null;
+  return `
+    <div class="restaurant">
+      <h3>${name}</h3>
+      <div class="rating">⭐ ${place.rating.toFixed(1)} <span>(${place.userRatingCount.toLocaleString("he-IL")} ביקורות)</span></div>
+      <div class="meta">${type}${price ? " · " + price : ""}${km !== null ? ` · כ־${km} ק״מ` : ""}</div>
+      <div class="address">${address}</div>
+      <a href="${escapeHtml(place.googleMapsUri || "")}" target="_blank" rel="noopener">📍 פתיחה ב־Google Maps ←</a>
+    </div>`;
+}
+
+// מונע הזרקת HTML מתוך שמות וכתובות שמגיעים מגוגל
+function escapeHtml(text) {
+  return String(text).replace(/[&<>"']/g, (c) =>
+    ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 }
