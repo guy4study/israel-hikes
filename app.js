@@ -18,6 +18,13 @@ const EXCLUDED_TYPES = ["hotel", "lodging", "guest_house", "hostel", "inn", "mot
   "resort_hotel", "bed_and_breakfast", "extended_stay_hotel", "cottage", "farmstay",
   "parking", "parking_lot"];
 
+// מקומות מעבר לגבול (למשל עקבה מול אילת) – לא נכללים
+const FOREIGN_COUNTRIES = ["ירדן", "מצרים", "לבנון", "סוריה", "Jordan", "Egypt", "Lebanon", "Syria"];
+function isAbroad(place) {
+  const address = place.formattedAddress || "";
+  return FOREIGN_COUNTRIES.some((country) => address.endsWith(country));
+}
+
 form.addEventListener("submit", async (event) => {
   event.preventDefault();
   const query = input.value.trim();
@@ -98,7 +105,7 @@ async function showHikes(location) {
 async function searchHikes(location, radiusKm) {
   const places = await searchNearbyPlaces(location, radiusKm * 1000, HIKE_TYPES, [
     "displayName", "rating", "userRatingCount", "location", "googleMapsUri",
-    "primaryType", "primaryTypeDisplayName", "editorialSummary",
+    "primaryType", "primaryTypeDisplayName", "editorialSummary", "formattedAddress",
   ]);
   return places
     .filter((p) => p.location)
@@ -114,7 +121,7 @@ function pickTopHikes(places, minRating) {
   return places
     .filter((p) => p.rating && p.rating >= minRating)
     .filter((p) => (p.userRatingCount || 0) >= MIN_HIKE_REVIEWS)
-    .filter((p) => !EXCLUDED_TYPES.includes(p.primaryType))
+    .filter((p) => !EXCLUDED_TYPES.includes(p.primaryType) && !isAbroad(p))
     .sort((a, b) => b.rating - a.rating || b.userRatingCount - a.userRatingCount)
     .slice(0, MAX_RESULTS);
 }
@@ -310,7 +317,7 @@ function searchRestaurants(location, radiusMeters) {
 function pickTopRestaurants(places) {
   return places
     .filter((p) => (p.userRatingCount || 0) >= MIN_REVIEWS && p.rating)
-    .filter((p) => !EXCLUDED_TYPES.includes(p.primaryType))
+    .filter((p) => !EXCLUDED_TYPES.includes(p.primaryType) && !isAbroad(p))
     .sort((a, b) => b.rating - a.rating || b.userRatingCount - a.userRatingCount)
     .slice(0, MAX_RESTAURANTS);
 }
