@@ -1,0 +1,38 @@
+// מסלולים שאנחנו מכירים (מהרשימה הקבועה של גרסה 1.x).
+// כשמקום שגוגל מחזירה נמצא ליד אחד מהם ושמו דומה, מציגים את האורך ודרגת הקושי מכאן
+// במקום הערכה. אפשר להוסיף כאן מסלולים נוספים.
+// difficulty: Easy / Moderate / Hard
+const KNOWN_TRAILS = [
+  { name: "מפל הבניאס ונחל חרמון", lat: 33.247, lng: 35.690, km: 3.5, difficulty: "Easy" },
+  { name: "נחל ג'לבון", lat: 33.030, lng: 35.710, km: 6, difficulty: "Moderate" },
+  { name: "נחל יהודיה עילי", lat: 32.940, lng: 35.710, km: 6, difficulty: "Hard" },
+  { name: "נחל זוויתן", lat: 32.970, lng: 35.730, km: 7, difficulty: "Moderate" },
+  { name: "נחל עמוד", lat: 32.930, lng: 35.480, km: 8, difficulty: "Moderate" },
+  { name: "מסלול פסגת הר מירון", lat: 32.997, lng: 35.410, km: 4, difficulty: "Easy" },
+  { name: "נחל כזיב ומבצר מונפור", lat: 33.040, lng: 35.220, km: 6, difficulty: "Moderate" },
+  { name: "הר ארבל", lat: 32.820, lng: 35.500, km: 4, difficulty: "Hard" },
+  { name: "עלייה להר תבור", lat: 32.687, lng: 35.390, km: 5, difficulty: "Moderate" },
+  { name: "שביל אירוס הגלבוע", lat: 32.470, lng: 35.400, km: 3, difficulty: "Easy" },
+  { name: "שווייץ הקטנה", lat: 32.730, lng: 35.020, km: 4, difficulty: "Easy" },
+  { name: "נחל מערות", lat: 32.670, lng: 34.970, km: 2, difficulty: "Easy" },
+  { name: "נחל תנינים", lat: 32.540, lng: 34.920, km: 3, difficulty: "Easy" },
+  { name: "נחל פולג וחוף הים", lat: 32.270, lng: 34.830, km: 4, difficulty: "Easy" },
+  { name: "מצוק הרצליה ואפולוניה", lat: 32.190, lng: 34.810, km: 3, difficulty: "Easy" },
+  { name: "מקורות הירקון (תל אפק)", lat: 32.105, lng: 34.930, km: 3, difficulty: "Easy" },
+  { name: "מעיינות סטף", lat: 31.770, lng: 35.130, km: 4, difficulty: "Moderate" },
+  { name: "נחל קטלב", lat: 31.750, lng: 35.100, km: 5, difficulty: "Moderate" },
+  { name: "נחל כסלון", lat: 31.770, lng: 35.050, km: 6, difficulty: "Moderate" },
+  { name: "יער בן שמן", lat: 31.950, lng: 34.930, km: 5, difficulty: "Easy" },
+  { name: "מערות בית גוברין", lat: 31.600, lng: 34.890, km: 3, difficulty: "Easy" },
+  { name: "עין גדי – נחל דוד", lat: 31.466, lng: 35.385, km: 3, difficulty: "Easy" },
+  { name: "נחל ערוגות", lat: 31.440, lng: 35.380, km: 6, difficulty: "Moderate" },
+  { name: "שביל הנחש במצדה", lat: 31.315, lng: 35.360, km: 2.5, difficulty: "Hard" },
+  { name: "נחל בוקק", lat: 31.200, lng: 35.360, km: 2, difficulty: "Easy" },
+  { name: "עין עבדת", lat: 30.820, lng: 34.770, km: 3, difficulty: "Moderate" },
+  { name: "הר ארדון (מכתש רמון)", lat: 30.580, lng: 34.860, km: 8, difficulty: "Hard" },
+  { name: "החולות הצבעוניים – המכתש הגדול", lat: 30.950, lng: 35.000, km: 2, difficulty: "Easy" },
+  { name: "הקניון האדום", lat: 29.765, lng: 34.917, km: 2, difficulty: "Easy" },
+  { name: "הר שלמה", lat: 29.530, lng: 34.930, km: 9, difficulty: "Hard" },
+  { name: "הר צפחות", lat: 29.530, lng: 34.920, km: 4, difficulty: "Moderate" },
+  { name: "פארק תמנע – עמודי שלמה", lat: 29.790, lng: 35.060, km: 3, difficulty: "Easy" },
+];

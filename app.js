@@ -1,6 +1,8 @@
 const form = document.getElementById("search-form");
 const input = document.getElementById("place-input");
 const minRatingSelect = document.getElementById("min-rating");
+const difficultySelect = document.getElementById("difficulty");
+const maxLengthInput = document.getElementById("max-length");
 const statusEl = document.getElementById("status");
 const resultsEl = document.getElementById("results");
 const weatherEl = document.getElementById("weather");
@@ -9,6 +11,9 @@ const MAX_RESULTS = 8;            // כמה מסלולים להציג
 const MIN_HIKE_REVIEWS = 50;      // מקום נכלל רק עם 50 ביקורות ומעלה (מסנן פינות זניחות)
 const DEFAULT_RADIUS_KM = 20;     // טווח חיפוש כשלא הוזן מרחק
 const MAX_RADIUS_KM = 50;         // הטווח המקסימלי שגוגל מאפשר
+
+// שמות דרגות הקושי בעברית (הערכים בקוד נשארים באנגלית)
+const DIFFICULTY_HE = { Easy: "קל", Moderate: "בינוני", Hard: "קשה" };
 
 // סוגי המקומות שמחפשים בגוגל: אזורי טיול, גנים לאומיים ושמורות טבע
 const HIKE_TYPES = ["hiking_area", "national_park", "nature_preserve", "state_park"];
@@ -75,20 +80,24 @@ async function findLocation(query) {
 
 // ---------------- מסלולים (חיפוש דינמי ב-Google Places) ----------------
 async function showHikes(location) {
-  const minRating = parseFloat(minRatingSelect.value) || 0;
+  const filters = {
+    minRating: parseFloat(minRatingSelect.value) || 0,
+    difficulty: difficultySelect.value,                         // "all" / Easy / Moderate / Hard
+    maxLength: parseFloat(maxLengthInput.value) || Infinity,    // תיבה ריקה = בלי הגבלה
+  };
   const userKm = parseFloat(document.getElementById("max-distance").value);
   const radiusKm = Math.min(userKm || DEFAULT_RADIUS_KM, MAX_RADIUS_KM);
 
   statusEl.textContent = "מחפש מסלולים באזור…";
   try {
-    let hikes = pickTopHikes(await searchHikes(location, radiusKm), minRating);
+    let hikes = await findHikes(location, radiusKm, filters);
     // בלי מרחק שהמשתמש קבע ומעט תוצאות – מרחיבים את החיפוש
     if (!userKm && hikes.length < 3) {
-      hikes = pickTopHikes(await searchHikes(location, MAX_RADIUS_KM), minRating);
+      hikes = await findHikes(location, MAX_RADIUS_KM, filters);
     }
 
     if (hikes.length === 0) {
-      statusEl.textContent = "לא נמצאו מסלולים שמתאימים לחיפוש. נסו להגדיל את המרחק או להוריד את הדירוג המינימלי.";
+      statusEl.textContent = "לא נמצאו מסלולים שמתאימים לחיפוש. נסו להגדיל את המרחק או את האורך, או לשנות את דרגת הקושי והדירוג.";
       return;
     }
 
@@ -116,14 +125,120 @@ async function searchHikes(location, radiusKm) {
     .filter((p) => p.distance <= radiusKm);
 }
 
-// 50+ ביקורות, דירוג מינימלי, בלי מלונות/חניונים; ממוין לפי דירוג ואז מספר ביקורות
-function pickTopHikes(places, minRating) {
+// מחפש, מעריך אורך וקושי לכל מקום, מסנן לפי הפילטרים וממיין לפי דירוג
+async function findHikes(location, radiusKm, filters) {
+  const candidates = qualifyHikes(await searchHikes(location, radiusKm), filters.minRating);
+  await addEstimates(candidates);
+  return candidates
+    .filter((h) => filters.difficulty === "all" || h.estimate.difficulty === filters.difficulty)
+    .filter((h) => h.estimate.km <= filters.maxLength)
+    .sort((a, b) => b.rating - a.rating || b.userRatingCount - a.userRatingCount)
+    .slice(0, MAX_RESULTS);
+}
+
+// 50+ ביקורות, דירוג מינימלי, בלי מלונות/חניונים ובלי מקומות מעבר לגבול
+function qualifyHikes(places, minRating) {
   return places
     .filter((p) => p.rating && p.rating >= minRating)
     .filter((p) => (p.userRatingCount || 0) >= MIN_HIKE_REVIEWS)
-    .filter((p) => !EXCLUDED_TYPES.includes(p.primaryType) && !isAbroad(p))
-    .sort((a, b) => b.rating - a.rating || b.userRatingCount - a.userRatingCount)
-    .slice(0, MAX_RESULTS);
+    .filter((p) => !EXCLUDED_TYPES.includes(p.primaryType) && !isAbroad(p));
+}
+
+// ---------------- הערכת אורך ודרגת קושי ----------------
+// 1. אם המקום תואם מסלול מוכר (known-trails.js) – לוקחים את הנתונים משם.
+// 2. אחרת – הערכה לפי הפרשי הגובה סביב המקום (Open-Meteo Elevation, חינמי):
+//    פחות מ-100 מ׳ = קל, 100–280 מ׳ = בינוני, מעל 280 מ׳ = קשה.
+//    האורך: בסיס לפי סוג המקום, ועוד 1–2 ק״מ בשטח הררי.
+const RELIEF_EASY_MAX = 100;       // מטרים
+const RELIEF_MODERATE_MAX = 280;   // מטרים
+const SAMPLE_OFFSET_KM = 1.2;      // כמה רחוק מהמקום מודדים גובה (4 כיוונים)
+const BASE_KM_BY_TYPE = { hiking_area: 5, nature_preserve: 4, state_park: 4, national_park: 3 };
+const DEFAULT_BASE_KM = 4;
+
+// מילים כלליות שלא עוזרות לזהות מסלול לפי שם
+const GENERIC_WORDS = ["שמורת", "שמורה", "טבע", "גן", "לאומי", "פארק", "נחל", "הר", "עין",
+  "מסלול", "יער", "מפל", "מפלי", "חניון", "לילה", "שביל", "מערות"];
+
+async function addEstimates(hikes) {
+  const unknown = [];
+  for (const hike of hikes) {
+    const known = matchKnownTrail(hike);
+    if (known) {
+      hike.estimate = { km: known.km, difficulty: known.difficulty, source: "known" };
+    } else {
+      unknown.push(hike);
+    }
+  }
+  if (unknown.length === 0) return;
+
+  let reliefs = [];
+  try {
+    reliefs = await fetchReliefs(unknown.map((h) => h.location));
+  } catch (err) {
+    console.error("Elevation failed:", err); // בלי נתוני גובה – הערכה לפי סוג המקום בלבד
+  }
+  unknown.forEach((hike, i) => {
+    hike.estimate = estimateFromTerrain(hike.primaryType, reliefs[i]);
+  });
+}
+
+function estimateFromTerrain(type, relief) {
+  let difficulty = "Moderate";
+  let extraKm = 1;
+  if (Number.isFinite(relief)) {
+    if (relief < RELIEF_EASY_MAX) { difficulty = "Easy"; extraKm = 0; }
+    else if (relief < RELIEF_MODERATE_MAX) { difficulty = "Moderate"; extraKm = 1; }
+    else { difficulty = "Hard"; extraKm = 2; }
+  }
+  return { km: (BASE_KM_BY_TYPE[type] || DEFAULT_BASE_KM) + extraKm, difficulty, source: "estimate" };
+}
+
+// מקום תואם מסלול מוכר אם יש להם מילה משמעותית משותפת בשם והוא במרחק עד KNOWN_MATCH_KM ממנו
+// (נחלים ארוכים – לגוגל ולנו יכולות להיות נקודות שונות לאורך אותו נחל)
+const KNOWN_MATCH_KM = 8;
+function matchKnownTrail(hike) {
+  const words = significantWords(hike.displayName?.text || "");
+  return KNOWN_TRAILS.find((trail) =>
+    distanceKm(hike.location.latitude, hike.location.longitude, trail.lat, trail.lng) <= KNOWN_MATCH_KM &&
+    significantWords(trail.name).some((w) => words.some((v) => sameWord(w, v))));
+}
+
+function significantWords(name) {
+  return name.split(/[\s\-–(),'"׳]+/).filter((w) => w.length >= 3 && !GENERIC_WORDS.includes(w));
+}
+
+// "סטף" ו"הסטף" נחשבות אותה מילה (אות אחת נוספת בהתחלה, כמו ה' הידיעה)
+function sameWord(a, b) {
+  const [short, long] = a.length <= b.length ? [a, b] : [b, a];
+  return long === short || (long.length - short.length === 1 && long.endsWith(short));
+}
+
+// מודד גובה במרכז המקום ו-4 נקודות סביבו; מחזיר לכל מקום את ההפרש בין הגבוה לנמוך
+async function fetchReliefs(locations) {
+  const POINTS = 5;
+  const lats = [];
+  const lngs = [];
+  for (const loc of locations) {
+    const dLat = SAMPLE_OFFSET_KM / 111;
+    const dLng = SAMPLE_OFFSET_KM / (111 * Math.cos((loc.latitude * Math.PI) / 180));
+    for (const [a, b] of [[0, 0], [dLat, 0], [-dLat, 0], [0, dLng], [0, -dLng]]) {
+      lats.push((loc.latitude + a).toFixed(4));
+      lngs.push((loc.longitude + b).toFixed(4));
+    }
+  }
+  // השירות מקבל עד 100 נקודות בבקשה
+  const elevations = [];
+  for (let i = 0; i < lats.length; i += 100) {
+    const url = "https://api.open-meteo.com/v1/elevation?latitude=" + lats.slice(i, i + 100).join(",")
+      + "&longitude=" + lngs.slice(i, i + 100).join(",");
+    const response = await fetch(url);
+    if (!response.ok) throw new Error("Elevation API " + response.status);
+    elevations.push(...(await response.json()).elevation);
+  }
+  return locations.map((_, i) => {
+    const group = elevations.slice(i * POINTS, i * POINTS + POINTS);
+    return Math.max(...group) - Math.min(...group);
+  });
 }
 
 function renderCard(hike, location) {
@@ -145,6 +260,13 @@ function renderCard(hike, location) {
         <span class="stars">⭐ ${hike.rating.toFixed(1)}</span>
         (${hike.userRatingCount.toLocaleString("he-IL")} ביקורות)${type ? " · " + escapeHtml(type) : ""}
         · כ־${Math.round(hike.distance)} ק״מ מ${escapeHtml(location.name)}
+      </div>
+      <div class="estimate">
+        <span class="badge ${hike.estimate.difficulty}">${DIFFICULTY_HE[hike.estimate.difficulty]}</span>
+        כ־${hike.estimate.km} ק״מ
+        ${hike.estimate.source === "known"
+          ? '<span class="est-note">לפי המאגר שלנו</span>'
+          : '<span class="est-note" title="הערכה לפי סוג המקום והפרשי הגובה בסביבתו">הערכה</span>'}
       </div>
       ${summary ? `<p>${escapeHtml(summary)}</p>` : ""}
       <div class="links">

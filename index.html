@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>מוצא מסלולי טיולים בישראל</title>
-  <link rel="stylesheet" href="style.css?v=2.0.1" />
+  <link rel="stylesheet" href="style.css?v=2.1.0" />
 </head>
 <body>
   <header>
@@ -26,7 +26,14 @@
         <option value="4.3">⭐ 4.3 ומעלה</option>
         <option value="4.5">⭐ 4.5 ומעלה</option>
       </select>
-      <input id="max-distance" type="number" min="1" max="50" step="1" placeholder="מרחק מקסימלי מהמקום (ק״מ)" />
+      <select id="difficulty">
+        <option value="all">כל דרגות הקושי</option>
+        <option value="Easy">קל</option>
+        <option value="Moderate">בינוני</option>
+        <option value="Hard">קשה</option>
+      </select>
+      <input id="max-length" type="number" min="1" step="1" placeholder="אורך מקס׳ (ק״מ)" />
+      <input id="max-distance" type="number" min="1" max="50" step="1" placeholder="מרחק מקס׳ מהמקום (ק״מ)" />
       <button type="submit">חיפוש מסלולים</button>
     </form>
 
@@ -38,13 +45,14 @@
 
   <footer>
     המסלולים, הדירוגים והמסעדות מגיעים מ-Google Maps. בדקו תמיד את תנאי השטח, מזג האוויר ושעות הפתיחה לפני היציאה.
-    <div class="version">גרסה 2.0.1</div>
+    <div class="version">גרסה 2.1.0</div>
   </footer>
 
   <!-- Site version (see CHANGELOG.md). Update it here: in the footer line above
        and in every ?v=... — the ?v= also makes browsers load the new files. -->
-  <script src="config.js?v=2.0.1"></script>
-  <script src="places.js?v=2.0.1"></script>
-  <script src="app.js?v=2.0.1"></script>
+  <script src="config.js?v=2.1.0"></script>
+  <script src="places.js?v=2.1.0"></script>
+  <script src="known-trails.js?v=2.1.0"></script>
+  <script src="app.js?v=2.1.0"></script>
 </body>
 </html>

@@ -12,30 +12,40 @@
 | `style.css` | העיצוב |
 | `app.js` | החיפוש הדינמי של מסלולים ומסעדות (Google Places), מזג האוויר והקישורים |
 | `places.js` | רשימת שמות מקומות (עברית ואנגלית) לחיפוש מהיר |
+| `known-trails.js` | 32 מסלולים מוכרים עם אורך ודרגת קושי (במקום הערכה) |
 | `config.js` | מפתח Google API למסלולים ולמסעדות (מוגבל לאתר הזה בלבד) |
 | `CHANGELOG.md` | מה השתנה בכל גרסה |
 
 ## איך מוציאים גרסה חדשה
 
-1. מבצעים את השינוי בקוד.
-2. ב-`index.html` מעלים את מספר הגרסה בכל המקומות: בשורה `גרסה X.Y.Z` בתחתית הדף ובכל `?v=X.Y.Z`.
-3. מוסיפים רשומה חדשה בראש `CHANGELOG.md`.
-4. שומרים ומעלים:
+כל שינוי עובר דרך **ענף נפרד ו-Pull Request**. האתר החי מתעדכן רק אחרי שמאשרים וממזגים ל-`main`.
+
+1. יוצרים ענף לשינוי: `git switch -c feature/<שם-קצר>`
+2. מבצעים את השינוי בקוד.
+3. ב-`index.html` מעלים את מספר הגרסה בכל המקומות: בשורה `גרסה X.Y.Z` בתחתית הדף ובכל `?v=X.Y.Z`.
+4. מוסיפים רשומה חדשה בראש `CHANGELOG.md`.
+5. שומרים, מעלים את הענף ופותחים Pull Request:
    ```
    git add -A
-   git commit -m "Release X.Y.Z"
+   git commit -m "..."
+   git push -u origin feature/<שם-קצר>
+   gh pr create --base main
+   ```
+6. עוברים על השינויים ב-GitHub ולוחצים **Merge pull request**. אחרי 1–2 דקות האתר החי מתעדכן.
+7. אחרי המיזוג מדביקים תג על `main`:
+   ```
+   git switch main
+   git pull
    git tag -a vX.Y.Z -m "גרסה X.Y.Z"
-   git push
    git push origin vX.Y.Z
    ```
-5. אחרי 1–2 דקות האתר החי מתעדכן. בתחתית הדף תופיע הגרסה החדשה.
 
 ## חזרה לגרסה קודמת (אם משהו נשבר)
 
 לא מוחקים היסטוריה. מחזירים את הקבצים מהגרסה הטובה ומוציאים אותם כגרסה חדשה:
 
 ```
-git checkout v2.0.0 -- index.html style.css app.js places.js config.js
+git checkout v2.1.0 -- index.html style.css app.js places.js known-trails.js config.js
 ```
 
 אחר כך מעדכנים את מספר הגרסה ב-`index.html` למספר חדש (למשל 2.0.1), כותבים ב-`CHANGELOG.md` "חזרה לתוכן של 2.0.0", ומבצעים את שלב 4 שלמעלה.
