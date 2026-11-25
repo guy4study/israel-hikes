@@ -42,16 +42,16 @@ main { max-width: 1180px; margin: 0 auto; padding: 24px 16px; }
   min-width: 0; /* lets fields shrink instead of overflowing */
 }
 #place-input { flex: 1 1 0; }
-#difficulty { flex: 0 0 165px; background: white; }
-#max-length, #max-distance { flex: 0 0 240px; }
+#min-rating { flex: 0 0 165px; background: white; }
+#max-distance { flex: 0 0 240px; }
 #search-form button { flex: 0 0 auto; white-space: nowrap; padding: 0 20px; }
 
 /* Narrower screens (tablets, phones): let the controls wrap onto more rows */
-@media (max-width: 1150px) {
+@media (max-width: 900px) {
   #search-form { flex-wrap: wrap; }
   #place-input { flex: 1 1 100%; }
-  #difficulty { flex: 1 1 160px; }
-  #max-length, #max-distance { flex: 1 1 220px; }
+  #min-rating { flex: 1 1 160px; }
+  #max-distance { flex: 1 1 220px; }
   #search-form button { flex: 1 1 100%; }
 }
 button {
@@ -110,17 +110,7 @@ button:hover { background: #24542d; }
 .card a { color: #2f6b3a; font-weight: 600; }
 .card .links { display: flex; gap: 20px; flex-wrap: wrap; }
 
-.badge {
-  display: inline-block;
-  padding: 2px 10px;
-  border-radius: 999px;
-  font-size: 0.8rem;
-  font-weight: 600;
-  margin-inline-end: 6px;
-}
-.Easy { background: #dff3e0; color: #1f6b2a; }
-.Moderate { background: #fff1d1; color: #8a5a00; }
-.Hard { background: #fbdcdc; color: #9b1c1c; }
+.card .stars { font-weight: 700; color: #b26b00; }
 
 footer {
   text-align: center;

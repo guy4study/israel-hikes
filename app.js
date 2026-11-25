@@ -1,14 +1,22 @@
 const form = document.getElementById("search-form");
 const input = document.getElementById("place-input");
-const difficultySelect = document.getElementById("difficulty");
+const minRatingSelect = document.getElementById("min-rating");
 const statusEl = document.getElementById("status");
 const resultsEl = document.getElementById("results");
 const weatherEl = document.getElementById("weather");
 
-const MAX_RESULTS = 6;
+const MAX_RESULTS = 8;            // כמה מסלולים להציג
+const MIN_HIKE_REVIEWS = 50;      // מקום נכלל רק עם 50 ביקורות ומעלה (מסנן פינות זניחות)
+const DEFAULT_RADIUS_KM = 20;     // טווח חיפוש כשלא הוזן מרחק
+const MAX_RADIUS_KM = 50;         // הטווח המקסימלי שגוגל מאפשר
 
-// שמות רמות הקושי בעברית (הערכים בנתונים נשארים באנגלית)
-const DIFFICULTY_HE = { Easy: "קל", Moderate: "בינוני", Hard: "קשה" };
+// סוגי המקומות שמחפשים בגוגל: אזורי טיול, גנים לאומיים ושמורות טבע
+const HIKE_TYPES = ["hiking_area", "national_park", "nature_preserve", "state_park"];
+
+// מקומות שהסוג הראשי שלהם לינה או חניון – לא נכללים (גם לא במסעדות)
+const EXCLUDED_TYPES = ["hotel", "lodging", "guest_house", "hostel", "inn", "motel",
+  "resort_hotel", "bed_and_breakfast", "extended_stay_hotel", "cottage", "farmstay",
+  "parking", "parking_lot"];
 
 form.addEventListener("submit", async (event) => {
   event.preventDefault();
@@ -33,7 +41,7 @@ form.addEventListener("submit", async (event) => {
 
 // הופך שם מקום ל- { name, lat, lng }
 async function findLocation(query) {
-  // 1. רשימת המקומות שלנו (מהיר, עובד גם בלי אינטרנט)
+  // 1. רשימת המקומות שלנו (מהיר, תומך בעברית ובאנגלית)
   const key = query.toLowerCase().replace(/['"]/g, "");
   if (PLACES[key]) {
     return { name: query, lat: PLACES[key][0], lng: PLACES[key][1] };
@@ -58,58 +66,116 @@ async function findLocation(query) {
   return null;
 }
 
-function showHikes(location) {
-  const difficulty = difficultySelect.value;
-  // תיבה ריקה = בלי הגבלה
-  const maxLength = parseFloat(document.getElementById("max-length").value) || Infinity;
-  const maxDistance = parseFloat(document.getElementById("max-distance").value) || Infinity;
+// ---------------- מסלולים (חיפוש דינמי ב-Google Places) ----------------
+async function showHikes(location) {
+  const minRating = parseFloat(minRatingSelect.value) || 0;
+  const userKm = parseFloat(document.getElementById("max-distance").value);
+  const radiusKm = Math.min(userKm || DEFAULT_RADIUS_KM, MAX_RADIUS_KM);
 
-  const hikes = TRAILS
-    .filter((t) => difficulty === "all" || t.difficulty === difficulty)
-    .filter((t) => parseFloat(t.length) <= maxLength) // "3.5 ק״מ" -> 3.5
-    .map((t) => ({ ...t, distance: distanceKm(location.lat, location.lng, t.lat, t.lng) }))
-    .filter((t) => t.distance <= maxDistance)
-    .sort((a, b) => a.distance - b.distance)
-    .slice(0, MAX_RESULTS);
+  statusEl.textContent = "מחפש מסלולים באזור…";
+  try {
+    let hikes = pickTopHikes(await searchHikes(location, radiusKm), minRating);
+    // בלי מרחק שהמשתמש קבע ומעט תוצאות – מרחיבים את החיפוש
+    if (!userKm && hikes.length < 3) {
+      hikes = pickTopHikes(await searchHikes(location, MAX_RADIUS_KM), minRating);
+    }
 
-  if (hikes.length === 0) {
-    statusEl.textContent = "אין מסלולים שמתאימים לסינון. נסו להגדיל את מגבלת הק״מ או לשנות את רמת הקושי.";
-    return;
+    if (hikes.length === 0) {
+      statusEl.textContent = "לא נמצאו מסלולים שמתאימים לחיפוש. נסו להגדיל את המרחק או להוריד את הדירוג המינימלי.";
+      return;
+    }
+
+    const capNote = userKm > MAX_RADIUS_KM ? ` (החיפוש מוגבל ל-${MAX_RADIUS_KM} ק״מ)` : "";
+    statusEl.textContent = `${hikes.length} המסלולים המומלצים ליד ${location.name}${capNote}:`;
+    resultsEl.innerHTML = hikes.map((h) => renderCard(h, location)).join("");
+  } catch (err) {
+    console.error("Hikes failed:", err);
+    statusEl.textContent = "לא ניתן לטעון מסלולים כרגע. נסו שוב בעוד רגע.";
   }
-
-  statusEl.textContent = `${hikes.length} המסלולים המומלצים ליד ${location.name}:`;
-  resultsEl.innerHTML = hikes.map(renderCard).join("");
 }
 
-function renderCard(hike) {
-  const mapsLink = `https://www.google.com/maps/search/?api=1&query=${hike.lat},${hike.lng}`;
+// מבקש מגוגל עד 20 אזורי טיול פופולריים בטווח, ומשאיר רק את מה שבתוך הטווח באמת
+async function searchHikes(location, radiusKm) {
+  const places = await searchNearbyPlaces(location, radiusKm * 1000, HIKE_TYPES, [
+    "displayName", "rating", "userRatingCount", "location", "googleMapsUri",
+    "primaryType", "primaryTypeDisplayName", "editorialSummary",
+  ]);
+  return places
+    .filter((p) => p.location)
+    .map((p) => ({
+      ...p,
+      distance: distanceKm(location.lat, location.lng, p.location.latitude, p.location.longitude),
+    }))
+    .filter((p) => p.distance <= radiusKm);
+}
+
+// 50+ ביקורות, דירוג מינימלי, בלי מלונות/חניונים; ממוין לפי דירוג ואז מספר ביקורות
+function pickTopHikes(places, minRating) {
+  return places
+    .filter((p) => p.rating && p.rating >= minRating)
+    .filter((p) => (p.userRatingCount || 0) >= MIN_HIKE_REVIEWS)
+    .filter((p) => !EXCLUDED_TYPES.includes(p.primaryType))
+    .sort((a, b) => b.rating - a.rating || b.userRatingCount - a.userRatingCount)
+    .slice(0, MAX_RESULTS);
+}
+
+function renderCard(hike, location) {
+  const name = hike.displayName?.text || "";
+  const lat = hike.location.latitude;
+  const lng = hike.location.longitude;
+  const mapsLink = hike.googleMapsUri || `https://www.google.com/maps/search/?api=1&query=${lat},${lng}`;
   // מפת Mapeak, בפורמט: /map/{zoom}/{lat}/{lng}
-  const mapeakLink = `https://mapeak.com/map/15/${hike.lat}/${hike.lng}`;
+  const mapeakLink = `https://mapeak.com/map/15/${lat}/${lng}`;
   // אתרי טיולים עם תיאור המסלול (חיפוש בגוגל מוגבל לכל אתר)
   const siteSearch = (site) =>
-    `https://www.google.com/search?q=${encodeURIComponent(hike.name + " site:" + site)}`;
-  const tiuliLink = siteSearch("tiuli.com");
-  const masaLink = siteSearch("masa.co.il");
-  const baliLink = siteSearch("baliletayel.co.il");
-  const nakebLink = siteSearch("nakeb.co.il");
+    `https://www.google.com/search?q=${encodeURIComponent(name + " site:" + site)}`;
+  const type = hike.primaryTypeDisplayName?.text;
+  const summary = hike.editorialSummary?.text;
   return `
     <div class="card">
-      <h3>${hike.name}</h3>
+      <h3>${escapeHtml(name)}</h3>
       <div class="meta">
-        <span class="badge ${hike.difficulty}">${DIFFICULTY_HE[hike.difficulty]}</span>
-        ${hike.region} · ${hike.length} · ${hike.time} · כ־${Math.round(hike.distance)} ק״מ ממך
+        <span class="stars">⭐ ${hike.rating.toFixed(1)}</span>
+        (${hike.userRatingCount.toLocaleString("he-IL")} ביקורות)${type ? " · " + escapeHtml(type) : ""}
+        · כ־${Math.round(hike.distance)} ק״מ מ${escapeHtml(location.name)}
       </div>
-      <p>${hike.description}</p>
+      ${summary ? `<p>${escapeHtml(summary)}</p>` : ""}
       <div class="links">
-        <a href="${mapsLink}" target="_blank" rel="noopener">📍 פתיחה ב־Google Maps ←</a>
+        <a href="${escapeHtml(mapsLink)}" target="_blank" rel="noopener">📍 פתיחה ב־Google Maps ←</a>
         <a href="${mapeakLink}" target="_blank" rel="noopener">🥾 פתיחה ב־Mapeak ←</a>
-        <a href="${tiuliLink}" target="_blank" rel="noopener">📝 תיאור באתר טיולי ←</a>
-        <a href="${masaLink}" target="_blank" rel="noopener">📝 תיאור באתר מסע אחר ←</a>
-        <a href="${baliLink}" target="_blank" rel="noopener">📝 תיאור באתר בא לי לטייל ←</a>
-        <a href="${nakebLink}" target="_blank" rel="noopener">📝 תיאור באתר נאקב ←</a>
+        <a href="${siteSearch("tiuli.com")}" target="_blank" rel="noopener">📝 תיאור באתר טיולי ←</a>
+        <a href="${siteSearch("masa.co.il")}" target="_blank" rel="noopener">📝 תיאור באתר מסע אחר ←</a>
+        <a href="${siteSearch("baliletayel.co.il")}" target="_blank" rel="noopener">📝 תיאור באתר בא לי לטייל ←</a>
+        <a href="${siteSearch("nakeb.co.il")}" target="_blank" rel="noopener">📝 תיאור באתר נאקב ←</a>
       </div>
     </div>
   `;
+}
+
+// חיפוש מקומות ליד נקודה ב-Google Places API (New) – משמש גם למסלולים וגם למסעדות
+async function searchNearbyPlaces(location, radiusMeters, includedTypes, fields) {
+  const response = await fetch("https://places.googleapis.com/v1/places:searchNearby", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "X-Goog-Api-Key": GOOGLE_API_KEY,
+      "X-Goog-FieldMask": fields.map((f) => "places." + f).join(","),
+    },
+    body: JSON.stringify({
+      includedTypes,
+      maxResultCount: 20,
+      rankPreference: "POPULARITY",
+      languageCode: "he",
+      locationRestriction: {
+        circle: { center: { latitude: location.lat, longitude: location.lng }, radius: radiusMeters },
+      },
+    }),
+  });
+  if (!response.ok) {
+    throw new Error(`Places API ${response.status}: ${await response.text()}`);
+  }
+  const data = await response.json();
+  return data.places || [];
 }
 
 // מרחק בקו אווירי בין שתי נקודות (נוסחת Haversine)
@@ -202,10 +268,6 @@ const PRICE_LEVELS = {
   PRICE_LEVEL_VERY_EXPENSIVE: "יקר מאוד",
 };
 
-// מקומות שהם בעיקר לינה (מלון עם מסעדה) – לא נכללים בהמלצות
-const LODGING_TYPES = ["hotel", "lodging", "guest_house", "hostel", "inn", "motel",
-  "resort_hotel", "bed_and_breakfast", "extended_stay_hotel", "cottage", "farmstay"];
-
 async function showRestaurants(location) {
   if (!GOOGLE_API_KEY) return; // אין מפתח – לא מציגים את האזור
 
@@ -237,40 +299,18 @@ async function showRestaurants(location) {
 }
 
 // חיפוש מסעדות ליד נקודה (עד 20 תוצאות, לפי פופולריות)
-async function searchRestaurants(location, radiusMeters) {
-  const response = await fetch("https://places.googleapis.com/v1/places:searchNearby", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "X-Goog-Api-Key": GOOGLE_API_KEY,
-      "X-Goog-FieldMask": [
-        "places.displayName", "places.rating", "places.userRatingCount",
-        "places.formattedAddress", "places.googleMapsUri", "places.location",
-        "places.priceLevel", "places.primaryType", "places.primaryTypeDisplayName",
-      ].join(","),
-    },
-    body: JSON.stringify({
-      includedTypes: ["restaurant"],
-      maxResultCount: 20,
-      rankPreference: "POPULARITY",
-      languageCode: "he",
-      locationRestriction: {
-        circle: { center: { latitude: location.lat, longitude: location.lng }, radius: radiusMeters },
-      },
-    }),
-  });
-  if (!response.ok) {
-    throw new Error(`Places API ${response.status}: ${await response.text()}`);
-  }
-  const data = await response.json();
-  return data.places || [];
+function searchRestaurants(location, radiusMeters) {
+  return searchNearbyPlaces(location, radiusMeters, ["restaurant"], [
+    "displayName", "rating", "userRatingCount", "formattedAddress", "googleMapsUri",
+    "location", "priceLevel", "primaryType", "primaryTypeDisplayName",
+  ]);
 }
 
 // רק 200+ ביקורות, בלי בתי מלון, ממוינות לפי דירוג (ובשוויון – לפי מספר ביקורות)
 function pickTopRestaurants(places) {
   return places
     .filter((p) => (p.userRatingCount || 0) >= MIN_REVIEWS && p.rating)
-    .filter((p) => !LODGING_TYPES.includes(p.primaryType))
+    .filter((p) => !EXCLUDED_TYPES.includes(p.primaryType))
     .sort((a, b) => b.rating - a.rating || b.userRatingCount - a.userRatingCount)
     .slice(0, MAX_RESTAURANTS);
 }
