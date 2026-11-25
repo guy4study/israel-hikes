@@ -435,11 +435,19 @@ function searchRestaurants(location, radiusMeters) {
   ]);
 }
 
-// רק 200+ ביקורות, בלי בתי מלון, ממוינות לפי דירוג (ובשוויון – לפי מספר ביקורות)
+// מסעדה = הקטגוריה הראשית בגוגל (מה שמופיע ב-Overview) היא Restaurant או סוג של מסעדה
+// ("Italian restaurant", "Hamburger restaurant"...) או Steak house.
+// בתי קפה, ברים, מלונות ומקומות בלי קטגוריה – לא נכללים.
+function isRestaurant(place) {
+  const type = place.primaryType || "";
+  return type === "restaurant" || type.endsWith("_restaurant") || type === "steak_house";
+}
+
+// רק מסעדות עם 200+ ביקורות, ממוינות לפי דירוג (ובשוויון – לפי מספר ביקורות)
 function pickTopRestaurants(places) {
   return places
     .filter((p) => (p.userRatingCount || 0) >= MIN_REVIEWS && p.rating)
-    .filter((p) => !EXCLUDED_TYPES.includes(p.primaryType) && !isAbroad(p))
+    .filter((p) => isRestaurant(p) && !isAbroad(p))
     .sort((a, b) => b.rating - a.rating || b.userRatingCount - a.userRatingCount)
     .slice(0, MAX_RESTAURANTS);
 }
